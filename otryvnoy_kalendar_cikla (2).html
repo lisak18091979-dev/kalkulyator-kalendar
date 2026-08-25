@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Отрывной календарь цикла планирования</title>
+<style>
+  :root{
+    --malachite:#123F31;
+    --malachite-deep:#0C2E24;
+    --mulberry:#7E4453;
+    --rose:#C98BA0;
+    --blush:#E8B4C5;
+    --cream:#FBF8F3;
+    --sand:#F5ECE2;
+    --graphite:#3D434A;
+    --ink:#2A2F35;
+    --line:#E3D6C6;
+    --green:#3F6B3A;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    min-height:100vh;
+    background:linear-gradient(160deg,var(--malachite) 0%,var(--malachite-deep) 42%,#4E3040 74%,var(--mulberry) 100%);
+    font-family:Arial,'PT Sans',sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 48px;
+  }
+  .eyebrow{
+    color:var(--blush);
+    letter-spacing:.28em;
+    font-size:12px;
+    text-transform:uppercase;
+    text-align:center;
+  }
+  h1{
+    font-family:Georgia,'PT Serif',serif;
+    color:var(--cream);
+    font-size:clamp(24px,4.4vw,38px);
+    text-align:center;
+    margin:10px 0 4px;
+    font-weight:700;
+  }
+  .sub{
+    color:var(--sand);
+    opacity:.85;
+    text-align:center;
+    font-size:14px;
+    max-width:560px;
+    line-height:1.55;
+    margin-bottom:26px;
+  }
+  .wall{
+    width:min(560px,100%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .magnet{
+    width:46px;height:46px;border-radius:50%;
+    background:radial-gradient(circle at 34% 30%,var(--blush),var(--rose) 55%,#A76A80 100%);
+    box-shadow:0 4px 10px rgba(0,0,0,.35), inset 0 -3px 6px rgba(0,0,0,.18);
+    z-index:6;position:relative;margin-bottom:-23px;
+  }
+  .calendar{
+    width:100%;
+    background:var(--cream);
+    border-radius:10px;
+    box-shadow:0 18px 44px rgba(0,0,0,.4);
+    overflow:hidden;
+    position:relative;
+  }
+  .cal-head{
+    background:var(--malachite);
+    color:var(--cream);
+    padding:26px 24px 16px;
+    text-align:center;
+  }
+  .cal-head .t1{
+    font-family:Georgia,'PT Serif',serif;
+    font-size:20px;font-weight:700;letter-spacing:.06em;
+  }
+  .cal-head .t2{
+    font-size:12px;letter-spacing:.22em;color:var(--blush);
+    text-transform:uppercase;margin-top:6px;
+  }
+  .counter{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:10px 18px;background:var(--sand);
+    border-bottom:1px solid var(--line);
+    font-size:13px;color:var(--graphite);
+  }
+  .counter b{color:var(--mulberry);}
+  .btn-early{
+    background:transparent;color:var(--mulberry);
+    border:1px solid var(--mulberry);border-radius:999px;
+    font-size:11.5px;font-weight:700;padding:6px 12px;
+    letter-spacing:.04em;display:none;
+  }
+  .btn-early.show{display:inline-block;}
+  .perf{
+    height:22px;background:var(--sand);position:relative;
+    border-bottom:2px dashed #C9B8A3;
+  }
+  .stubs{position:absolute;left:0;right:0;bottom:-1px;height:12px;display:flex;overflow:hidden;}
+  .stub{
+    flex:1;height:100%;
+    background:var(--cream);
+    clip-path:polygon(0 0,8% 70%,16% 20%,26% 85%,36% 30%,46% 90%,56% 25%,66% 80%,76% 35%,86% 88%,94% 30%,100% 0,100% 0,0 0);
+    opacity:0;transition:opacity .4s;
+  }
+  .stub.on{opacity:1;}
+  .stage{position:relative;display:grid;}
+  .layer{
+    grid-area:1/1;
+    padding:26px 26px 30px;
+    display:flex;flex-direction:column;align-items:center;
+    background:var(--cream);
+  }
+  .layer.back{z-index:1;}
+  .layer.front{z-index:3;transform-origin:18% -12%;cursor:pointer;}
+  .layer.front.torn{
+    animation:tearoff .85s cubic-bezier(.5,.05,.75,.4) forwards;
+    pointer-events:none;
+  }
+  .layer.front.gone{display:none;}
+  @keyframes tearoff{
+    0%{transform:rotate(0) translate(0,0);opacity:1;}
+    22%{transform:rotate(-3deg) translate(-6px,8px);}
+    100%{transform:rotate(26deg) translate(140px,760px);opacity:0;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .layer.front.torn{animation:none;visibility:hidden;}
+  }
+  .month{
+    font-size:13px;letter-spacing:.3em;color:var(--mulberry);
+    text-transform:uppercase;margin-top:8px;
+  }
+  .bignum{
+    font-family:Georgia,'PT Serif',serif;
+    font-size:132px;line-height:1;color:var(--ink);
+    font-weight:700;margin:6px 0 2px;
+  }
+  .front-cap{
+    font-size:14.5px;color:var(--graphite);text-align:center;
+    line-height:1.55;max-width:380px;
+  }
+  .front-cap .lab{
+    display:block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--mulberry);margin-bottom:6px;
+  }
+  .glossary{
+    margin-top:16px;width:100%;max-width:400px;
+    border-top:1px dashed #C9B8A3;padding-top:12px;
+    font-size:13.5px;line-height:1.5;color:var(--graphite);text-align:center;
+  }
+  .glossary .g-lab{
+    font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--mulberry);margin-bottom:6px;
+  }
+  .glossary b{color:var(--ink);}
+  .hint{
+    margin-top:auto;font-size:12px;color:#9A8C7B;text-align:center;padding-top:14px;
+  }
+  button{
+    font-family:Arial,'PT Sans',sans-serif;
+    border:none;cursor:pointer;border-radius:8px;
+    transition:transform .12s, box-shadow .12s, background .15s;
+  }
+  button:focus-visible{outline:3px solid var(--rose);outline-offset:2px;}
+  .btn-tear{
+    margin-top:18px;
+    background:var(--mulberry);color:var(--cream);
+    font-size:16px;font-weight:700;
+    padding:14px 34px;
+    box-shadow:0 6px 16px rgba(126,68,83,.35);
+  }
+  .btn-tear:hover{transform:translateY(-2px);}
+  .section-tag{
+    font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--cream);background:var(--malachite);
+    padding:6px 14px;border-radius:20px;margin-bottom:16px;
+  }
+  .q-text{
+    font-family:Georgia,'PT Serif',serif;
+    font-size:19px;line-height:1.45;color:var(--ink);
+    text-align:center;max-width:430px;margin-bottom:22px;
+  }
+  .answers{display:flex;flex-direction:column;gap:10px;width:100%;max-width:440px;}
+  .ans{
+    background:var(--sand);color:var(--ink);
+    border:2px solid var(--line);
+    padding:13px 16px;font-size:14.5px;line-height:1.4;
+    text-align:left;border-radius:8px;
+  }
+  .ans:hover{border-color:var(--rose);background:#F9EFE9;}
+  .ans.picked{border-color:var(--mulberry);background:var(--blush);font-weight:700;}
+  .ans.dim{opacity:.45;}
+  .ans.locked{cursor:default;}
+  .ans .mark{
+    float:right;margin-left:10px;font-weight:700;font-size:12px;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+  .ans.good .mark{color:var(--green);}
+  .ans.mid .mark{color:#A97C1F;}
+  .ans.bad .mark{color:#A03A2A;}
+  .reply{
+    width:100%;max-width:440px;margin-top:16px;
+    border-left:4px solid var(--mulberry);
+    background:#FBF1EC;
+    padding:14px 16px;border-radius:0 8px 8px 0;
+    font-family:Georgia,'PT Serif',serif;
+    font-size:15px;line-height:1.55;color:#3a322b;
+    display:none;
+  }
+  .reply.show{display:block;}
+  .reply .strip{
+    font-family:Arial,sans-serif;font-style:normal;
+    font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--mulberry);margin-bottom:8px;
+  }
+  .excuse{
+    width:100%;max-width:440px;margin-top:12px;
+    background:var(--sand);border:1px dashed #C9B8A3;
+    padding:12px 14px;border-radius:8px;
+    font-size:14px;line-height:1.55;color:var(--graphite);
+    display:none;
+  }
+  .excuse.show{display:block;}
+  .excuse .e-lab{
+    font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--mulberry);margin-bottom:8px;
+  }
+  .excuse .say{color:var(--ink);font-weight:700;}
+  .excuse .mean{display:block;margin-top:5px;}
+  .btn-next{
+    margin-top:18px;background:var(--malachite);color:var(--cream);
+    font-size:15px;font-weight:700;padding:12px 30px;
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .btn-next.show{opacity:1;pointer-events:auto;}
+  .verdict{grid-area:1/1;padding:30px 26px 34px;display:none;flex-direction:column;align-items:center;background:var(--cream);z-index:4;}
+  .verdict.show{display:flex;}
+  .stamp{
+    align-self:flex-end;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--mulberry);border:1px solid var(--mulberry);
+    padding:5px 10px;border-radius:999px;margin-bottom:8px;
+  }
+  .v-eyebrow{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--mulberry);}
+  .v-title{
+    font-family:Georgia,'PT Serif',serif;
+    font-size:clamp(22px,4vw,30px);color:var(--ink);
+    text-align:center;margin:10px 0 6px;font-weight:700;
+  }
+  .v-score{font-size:15px;color:var(--graphite);margin-bottom:18px;}
+  .v-desc{
+    font-size:14.5px;line-height:1.6;color:var(--graphite);
+    text-align:center;max-width:440px;margin-bottom:22px;
+  }
+  .v-table{width:100%;max-width:440px;border-top:1px solid var(--line);margin-bottom:22px;}
+  .v-row{
+    display:flex;justify-content:space-between;gap:12px;
+    padding:11px 4px;border-bottom:1px solid var(--line);
+    font-size:14px;color:var(--ink);
+  }
+  .v-row .st{font-weight:700;color:var(--mulberry);white-space:nowrap;}
+  .presc{
+    width:100%;max-width:440px;background:var(--sand);
+    border-left:4px solid var(--mulberry);
+    padding:16px 18px;border-radius:0 8px 8px 0;margin-bottom:18px;
+  }
+  .presc h3{
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--mulberry);margin-bottom:10px;
+  }
+  .presc ol{padding-left:18px;font-size:14px;line-height:1.6;color:var(--ink);}
+  .objections{
+    width:100%;max-width:440px;margin-bottom:18px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  }
+  .objections h3{
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--cream);background:var(--malachite);
+    padding:11px 16px;font-weight:700;
+  }
+  .obj-row{padding:13px 16px;border-bottom:1px solid var(--line);font-size:14px;line-height:1.55;}
+  .obj-row:last-child{border-bottom:none;}
+  .obj-row .said{color:var(--mulberry);font-weight:700;display:block;margin-bottom:4px;}
+  .obj-row .answer{color:var(--ink);}
+  .phrase{
+    width:100%;max-width:440px;margin-bottom:22px;
+    border:1px dashed #C9B8A3;border-radius:8px;padding:14px 16px;
+    font-family:Georgia,'PT Serif',serif;font-size:15px;line-height:1.55;color:#3a322b;
+  }
+  .phrase .p-lab{
+    font-family:Arial,sans-serif;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--mulberry);margin-bottom:8px;
+  }
+  .fridge{
+    width:100%;max-width:440px;margin-bottom:22px;
+    background:var(--malachite);border-radius:10px;padding:18px 18px 16px;
+  }
+  .fridge h3{
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--blush);margin-bottom:4px;
+  }
+  .fridge .f-sub{font-size:12.5px;color:#BFD3C8;margin-bottom:14px;line-height:1.5;}
+  .f-row{
+    display:flex;align-items:center;gap:12px;
+    padding:9px 0;border-bottom:1px solid rgba(232,180,197,.22);
+    color:var(--cream);font-size:14px;
+  }
+  .f-row:last-child{border-bottom:none;}
+  .f-dot{
+    flex:0 0 34px;height:34px;border-radius:50%;
+    background:radial-gradient(circle at 34% 30%,var(--blush),var(--rose) 55%,#A76A80 100%);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:#4A2430;
+  }
+  .f-row .f-name{flex:1;}
+  .f-row .f-date{font-weight:700;color:var(--blush);white-space:nowrap;}
+  .f-btn{
+    margin-top:14px;width:100%;background:var(--blush);color:#4A2430;
+    font-size:13.5px;font-weight:700;padding:11px 14px;
+  }
+  .v-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  .btn-act{
+    background:var(--malachite);color:var(--cream);
+    font-size:14px;font-weight:700;padding:12px 20px;
+  }
+  .btn-act.alt{background:var(--mulberry);}
+  .btn-act.ghost{background:transparent;color:var(--mulberry);border:2px solid var(--mulberry);}
+  .footer{
+    margin-top:26px;color:var(--sand);opacity:.75;font-size:12.5px;
+    text-align:center;letter-spacing:.04em;line-height:1.6;
+  }
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--ink);color:var(--cream);padding:12px 22px;border-radius:8px;
+    font-size:14px;transition:transform .3s;z-index:50;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  @media(max-width:480px){
+    .bignum{font-size:104px;}
+    .stage{min-height:520px;}
+    .layer{padding:20px 16px 24px;}
+    .verdict{padding:24px 16px 28px;}
+    .counter{font-size:12px;padding:9px 12px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="eyebrow">Серия S&amp;OP → IBP · выпуск 7</div>
+<h1>Отрывной календарь цикла</h1>
+<p class="sub">Двенадцать листков, по одному на месяц. Спереди примета месяца и строчка из словаря, сзади вопрос про ваш ритм планирования, честный разбор ответа и отговорка месяца с переводом. Можно оторвать все двенадцать, можно остановиться раньше: вердикт считается от того, что вы прошли.</p>
+
+<div class="wall">
+  <div class="magnet" aria-hidden="true"></div>
+  <div class="calendar">
+    <div class="cal-head">
+      <div class="t1">ЦИКЛ ПЛАНИРОВАНИЯ</div>
+      <div class="t2">календарь отрывной · на 12 месяцев</div>
+    </div>
+    <div class="counter">
+      <span>Листок <b id="cnt">1</b> из 12 · <span id="score-live">баллы ритма: 0</span></span>
+      <button class="btn-early" id="btnEarly">Подвести итог сейчас</button>
+    </div>
+    <div class="perf"><div class="stubs" id="stubs"></div></div>
+
+    <div class="stage" id="stage">
+      <!-- оборот (вопрос) -->
+      <div class="layer back" id="backLayer">
+        <div class="section-tag" id="qSection"></div>
+        <div class="q-text" id="qText"></div>
+        <div class="answers" id="answers"></div>
+        <div class="reply" id="reply"><div class="strip">Разбор</div><span id="replyText"></span></div>
+        <div class="excuse" id="excuse">
+          <div class="e-lab">Отговорка месяца</div>
+          <span class="say" id="excuseSay"></span>
+          <span class="mean" id="excuseMean"></span>
+        </div>
+        <button class="btn-next" id="btnNext">Следующий листок</button>
+      </div>
+      <!-- лицевая сторона -->
+      <div class="layer front" id="frontLayer">
+        <div class="month" id="monthLbl">ЯНВАРЬ</div>
+        <div class="bignum" id="numLbl">1</div>
+        <div class="front-cap" id="frontCap"><span class="lab">Примета месяца</span><span id="omenText"></span></div>
+        <div class="glossary"><div class="g-lab">Словарь цикла</div><span id="termText"></span></div>
+        <button class="btn-tear" id="btnTear">Оторвать листок</button>
+        <div class="hint">Листок отрывается один раз, как и месяц</div>
+      </div>
+      <!-- вердикт -->
+      <div class="verdict" id="verdict">
+        <div class="stamp" id="vStamp">Сертификат на холодильник</div>
+        <div class="v-eyebrow">Вердикт по ритму</div>
+        <div class="v-title" id="vTitle"></div>
+        <div class="v-score" id="vScore"></div>
+        <div class="v-desc" id="vDesc"></div>
+        <div class="v-table" id="vTable"></div>
+        <div class="presc">
+          <h3 id="prescTitle">Первые три шага</h3>
+          <ol id="prescList"></ol>
+        </div>
+        <div class="objections">
+          <h3 id="objTitle">Что вам ответят и что сказать в ответ</h3>
+          <div id="objRows"></div>
+        </div>
+        <div class="phrase">
+          <div class="p-lab">Фраза для планерки</div>
+          <span id="phraseText"></span>
+        </div>
+        <div class="fridge">
+          <h3>Пять магнитов на холодильник</h3>
+          <div class="f-sub" id="fridgeSub"></div>
+          <div id="fridgeRows"></div>
+          <button class="f-btn" id="btnDates">Скопировать даты для письма</button>
+        </div>
+        <div class="v-actions">
+          <button class="btn-act" id="btnPng">Скачать карточку PNG</button>
+          <button class="btn-act alt" id="btnCopy">Скопировать итог для комментария</button>
+          <button class="btn-act ghost" id="btnRestart">Начать заново</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Ритм проверяется не в январе, а каждый месяц.<br>Лисак Е.Ф. · @zakupshchitsa_ural</div>
+<div class="toast" id="toast">Скопировано</div>
+
+<canvas id="cv" width="1280" height="720" style="display:none"></canvas>
+
+<script>
+/* ===== 12 листков ===== */
+const LEAFS=[
+{m:'ЯНВАРЬ', s:'A',
+ omen:'План на год уже утвержден. Закупки узнают о нем в феврале.',
+ term:'<b>ВКС</b> это видеоконференцсвязь. Первые семь минут из тридцати уходят на вопрос «вы меня слышите».',
+ q:'Даты совещаний цикла на следующий квартал уже стоят в календаре?',
+ a:[['Да, даты цикла стоят в календаре на год вперед',2,'Дата в календаре это самая дешевая дисциплина из всех, что можно купить. Стоит ноль рублей и держит весь год. Следующий шаг: договориться, что дата не двигается даже под первое лицо.'],
+    ['Даты ставим на месяц вперед, дальше по обстановке',1,'Календарь на месяц вперед это не цикл, а расписание дежурной смены. Позиция со сроком заготовления в три месяца в такое расписание не помещается.'],
+    ['Отдельных дат нет, собираемся, когда появляется вопрос',0,'Совещание по требованию это не планирование, а разбор. Разбор всегда дороже плана, потому что оплачивается срочной доставкой.']],
+ ex:['«Вернемся к этому после праздников»','Праздники в этой формулировке заканчиваются в конце февраля.']},
+
+{m:'ФЕВРАЛЬ', s:'A',
+ omen:'Самый короткий месяц. Факт за январь сводят ровно столько же, сколько за длинный.',
+ term:'<b>ФНГ</b> это «факт не готов». Причина переноса номер один, работает круглый год и не требует доказательств.',
+ q:'Ключевой участник в отпуске, а совещание цикла стоит на этой неделе. Что происходит?',
+ a:[['Проходит в свою дату, вместо него заместитель с его цифрами',2,'Цикл, который не двигают под человека, принадлежит компании. Тот, который двигают, принадлежит человеку. Проверяется это ровно один раз в году, в июле.'],
+    ['Совещание сдвигаем на несколько дней, чтобы он успел',1,'Пара дней в месяц это две недели в год. Ровно на эти две недели каждый раз опаздывает план обеспечения.'],
+    ['В этом месяце совещание не проводим',0,'Пропущенный месяц не догоняется. Следующий цикл начинается с оправданий вместо цифр.']],
+ ex:['«Факт еще не готов»','Факт готов. Он не нравится.']},
+
+{m:'МАРТ', s:'A',
+ omen:'Конец квартала. Слово «план» звучит чаще, чем за весь предыдущий квартал.',
+ term:'<b>КПЭ</b> официально это ключевые показатели эффективности. В цехе это «кричи, пока эффективно».',
+ q:'Когда после закрытия месяца появляется факт, с которым уже никто не спорит?',
+ a:[['К пятому рабочему дню следующего месяца',2,'Пока факт не сведен, любое совещание превращается в спор о том, что уже случилось. Пятый рабочий день это граница между планированием и следствием.'],
+    ['К середине следующего месяца, дальше еще уточняется',1,'Половина цикла уходит на прошлое. На будущее остается вторая половина, и та в спешке.'],
+    ['Окончательные цифры появляются через два месяца',0,'Планировать по факту, которому два месяца, это ехать по зеркалу заднего вида. Едет, но недолго.']],
+ ex:['«Надо посмотреть в динамике»','Динамику никто не смотрел и не посмотрит.']},
+
+{m:'АПРЕЛЬ', s:'A',
+ omen:'Чем теплее на улице, тем срочнее заявка. Проверено на всех широтах.',
+ term:'<b>ДПП</b> это «до первого пожара». Срок жизни любого плана, у которого нет дат.',
+ q:'Как часто цикл проходит целиком, от факта до утвержденных решений?',
+ a:[['Каждый месяц',2,'Ежемесячный цикл переживает отпуска, болезни и смену людей. Все остальное держится на памяти одного сотрудника.'],
+    ['Раз в квартал',1,'Квартал это три месяца, в течение которых закупки принимают решения сами и потом за них отвечают.'],
+    ['Полного цикла нет: планируем при бюджете и при разборе итогов',0,'В компаниях, которые планируют дважды в год, снабжение живет в режиме срочных заявок остальные триста дней.']],
+ ex:['«Это срочно»','Об этом знали в феврале.']},
+
+{m:'МАЙ', s:'B',
+ omen:'Два раза по три выходных. Май проверяет ритм честнее любого аудита.',
+ term:'<b>ПДР</b> это «поставщик думает, что решает». Стадия переговоров ровно перед звонком директора директору.',
+ q:'Кто принимает решения на итоговом совещании цикла?',
+ a:[['Первое лицо, лично, хотя бы двадцать минут',2,'Двадцать минут первого лица стоят дороже трех часов всех остальных. Это единственная точка, где план становится обязательным.'],
+    ['Заместитель с правом решать в пределах своего лимита',1,'Работает, пока вопрос не выходит за лимит. Дальше решение уходит наверх и возвращается через неделю.'],
+    ['Никто из руководства не участвует, потом присылают протокол',0,'Совещание без права решать так и остается совещанием. Циклом оно становится тогда, когда после него что-то меняется.']],
+ ex:['«Давайте после майских»','После майских скажут «давайте после отпусков».']},
+
+{m:'ИЮНЬ', s:'B',
+ omen:'Полгода прошло. Кто-то уже сказал «со второго полугодия начнем по-новому». Он говорит это шестой год подряд.',
+ term:'<b>ППП</b> это «протокол пишем позже». Жанр, в котором решения не доживают до утра.',
+ q:'Как оформляется решение, принятое на совещании цикла?',
+ a:[['Формулировка, ответственный, срок',2,'Решение без ответственного и срока это пожелание. Пожелания не исполняются, они вспоминаются.'],
+    ['Протокол ведется, но без ответственных и сроков',1,'Такой протокол хорош для истории и бесполезен для работы. Через месяц по нему нельзя проверить ни одного пункта.'],
+    ['Решения фиксируются устно',0,'«Все же слышали» это самая дорогая фраза в снабжении. Дороже нее только «я думал, вы уже заказали».']],
+ ex:['«Мы же гибкие»','Плана нет, зато формулировка красивая.']},
+
+{m:'ИЮЛЬ', s:'B',
+ omen:'Отпуск у людей. У цикла отпуска нет, но его почему-то тоже нет.',
+ term:'<b>ОБС</b> это «одна бабка сказала». Источник прогноза продаж там, где статистику не ведут.',
+ q:'С чего начинается очередное совещание цикла?',
+ a:[['С проверки исполнения прошлых решений',2,'Проверка прошлых решений это единственный механизм, который заставляет их выполнять. Первые десять минут неприятные, дальше легче.'],
+    ['С текущих срочных вопросов',1,'Совещание, которое начинается с пожара, пожаром и заканчивается. Будущее на него не помещается.'],
+    ['Начинаем с нуля, к прошлым решениям не возвращаемся',0,'Цикл без памяти это двенадцать первых совещаний в год. Люди устают, а решения повторяются слово в слово.']],
+ ex:['«Я в копии»','Я тут ни при чем, но в курсе. Самая безопасная должность на заводе.']},
+
+{m:'АВГУСТ', s:'B',
+ omen:'Бюджет следующего года еще кажется реалистичным. Это пройдет к октябрю.',
+ term:'<b>ПБЛ</b> это «план был лучше». Произносится после отгрузки, когда сравнивать уже поздно.',
+ q:'Продажи называют одну цифру, производство другую. Как решается спор?',
+ a:[['Готовят два варианта с расчетом, выбирает руководитель',2,'Два варианта и две цены превращают спор в выбор. Это самая полезная строчка любого регламента.'],
+    ['Спорят на совещании, расчета вариантов нет',1,'Громкость это не аргумент, но пока нет расчета, других аргументов в комнате действительно нет.'],
+    ['Разногласие уходит наверх без расчетов',0,'Наверх надо носить варианты, а не обиды. Иначе решение принимает тот, кто зашел последним.']],
+ ex:['«Зафиксируем на берегу»','Фиксировать будем в момент отгрузки, на берегу как-то не сложилось.']},
+
+{m:'СЕНТЯБРЬ', s:'C',
+ omen:'Все вернулись из отпусков. Все удивились.',
+ term:'<b>СКС</b> это «соберемся, как сможем». Официальное название цикла планирования там, где дат нет.',
+ q:'Сколько наборов плановых цифр живет в компании?',
+ a:[['Один, общий для всех служб',2,'Один набор цифр экономит половину времени совещания. Вторую половину экономит сведенный факт.'],
+    ['Есть официальный план, но у служб свои рабочие файлы',1,'Официальный план в такой конструкции нужен для отчета, рабочие для жизни. Закупки обеспечивают оба.'],
+    ['У каждой службы свой план, единого нет',0,'Пока в компании три таблицы, снабжение закупает по самой смелой из них. Излишки потом называют страховым запасом.']],
+ ex:['«У меня другие цифры»','У меня свой файл, и он мне дороже общего.']},
+
+{m:'ОКТЯБРЬ', s:'C',
+ omen:'Четвертый квартал. Планирование внезапно становится популярным.',
+ term:'<b>УПС</b> это «уточним по ситуации». Горизонт планирования длиной в одно совещание.',
+ q:'План считается только в штуках и тоннах или в деньгах тоже?',
+ a:[['План сведен с бюджетом и с движением денег',2,'План в деньгах это и есть переход к интегрированному планированию. Все остальное косметика. Следующий шаг: считать стоимость каждого решения прямо на совещании.'],
+    ['Деньги считают отдельно, раз в квартал и другие люди',1,'План и бюджет, посчитанные разными людьми в разное время, не сходятся никогда. Разницу закрывает отсрочка.'],
+    ['Только в штуках и тоннах',0,'План без денег это свадьба без невесты. Гости на месте, стол накрыт, невесты нет.']],
+ ex:['«Надо проработать вопрос»','Вопрос отправлен в отпуск за свой счет. Бессрочный.']},
+
+{m:'НОЯБРЬ', s:'C',
+ omen:'В ноябре впервые спрашивают про декабрь. Металл на этот декабрь кто-то купил еще летом.',
+ term:'<b>НСЗ</b> это «на словах заказали». Форма заявки, которая всплывает в момент приемки.',
+ q:'На какой срок вперед считается план?',
+ a:[['На двенадцать месяцев, со сдвигом каждый месяц',2,'Скользящий горизонт единственный способ видеть длинные позиции заранее. Металл и литье короткого горизонта не прощают.'],
+    ['До конца календарного года',1,'Такой горизонт сокращается сам: в январе видно двенадцать месяцев, в ноябре два. У позиций со сроком заготовления в три месяца это ноябрьская катастрофа.'],
+    ['На месяц вперед',0,'Месячный горизонт означает, что все длинное покупается срочно. Наценка за срочность в план не заложена, но в бюджете она есть.']],
+ ex:['«Поставщик подведет, я чувствую»','Заявку я отдал вчера, но чувствую именно поставщика.']},
+
+{m:'ДЕКАБРЬ', s:'C',
+ omen:'Последний листок. Дальше либо ритм, либо чудо. Чудо в спецификацию не вписывается.',
+ term:'<b>ИТП</b> это «и так поймут». Основной формат передачи требований между службами.',
+ q:'Как закупки узнают об изменении плана продаж?',
+ a:[['Участвуют в цикле и видят изменение до утверждения плана',2,'Закупки в цикле это не вежливость, а способ успеть. Все, что известно на месяц раньше, стоит дешевле.'],
+    ['Получают готовый план после утверждения',1,'План приходит уже без права на вопрос. Возразить можно только сроком поставки, и это возражение услышат в цехе.'],
+    ['Узнают из заявки с пометкой «срочно»',0,'«Срочно» это не приоритет, а счет за опоздание. Оплачивается наценкой, авиадоставкой и нервами кладовщика.']],
+ ex:['«В следующем году будем планировать нормально»','Мы это уже говорили в прошлом декабре. И в позапрошлом.']}
+];
+
+const SECTIONS={A:'Дисциплина дат',B:'Люди и решения',C:'Содержание плана'};
+const PRESC={
+ A:['Назначить даты цикла на 12 месяцев вперед и внести их в календари участников.',
+    'Ввести правило: дата стоит, переносится содержание, а не совещание.',
+    'Установить норматив: сведенный факт не позднее пятого рабочего дня.'],
+ B:['Забронировать у первого лица 20 минут в месяц под решения цикла.',
+    'Ввести единый формат решения: формулировка, ответственный, срок.',
+    'Открывать каждое совещание проверкой исполнения прошлых решений.'],
+ C:['Свести все службы к одному набору плановых цифр.',
+    'Перевести план из штук и тонн в деньги и сверить с бюджетом.',
+    'Включить закупки в цикл с этапа обеспечения, а не после утверждения плана.']
+};
+const OBJ={
+ A:[['«У нас все меняется, какие даты»','Даты и нужны для того, чтобы видеть изменения вовремя. Меняется содержание, встреча остается на месте.'],
+    ['«Некогда, работать надо»','Час в месяц против недели разгребания. Предложите сравнить эти два числа на любом прошлом срыве.'],
+    ['«Мы и так каждый день на связи»','Ежедневная связь это тушение. Планирование это другой разговор, и он не помещается в оперативку.']],
+ B:[['«Директору некогда»','Просите двадцать минут, а не два часа. И приносите готовый выбор из двух вариантов, а не вопрос.'],
+    ['«Зачем протокол, все взрослые люди»','Протокол нужен не для контроля, а для памяти. Через месяц никто не помнит, кто что обещал.'],
+    ['«Мы решили, просто не записали»','Тогда предложите записать при них, в три строки. Возражений обычно не бывает.']],
+ C:[['«У каждого своя специфика, свой файл»','Файлы разные, цифра должна быть одна. Специфика живет в расчете, а не в итоге.'],
+    ['«Деньги это к финансистам»','Деньги это к тому, кто их тратит. Закупки тратят больше всех, значит, и считать им.'],
+    ['«План все равно не сбудется»','План нужен не для того, чтобы сбыться, а для того, чтобы отклонение было видно заранее.']]
+};
+const PHRASE={
+ A:'«Предлагаю поставить пять дат на год вперед и больше их не двигать. Двигать будем содержание, а не совещание.»',
+ B:'«Прошу двадцать минут вашего времени раз в месяц. Одна повестка, решения под протокол, следующий раз начинаем с их проверки.»',
+ C:'«Предлагаю свести службы к одному набору цифр и добавить в план деньги. Иначе мы планируем штуки, а отвечаем рублями.»'
+};
+const LEVELS=[
+ {min:.84,t:'Цикл идет сам',stamp:'Допуск к S&OP-комитету',
+  d:'Даты стоят, решения записаны, план один на всех. Такой ритм переживает и отпуска, и смену людей. Следующая ступень это деньги в каждом решении, то есть переход к интегрированному планированию.'},
+ {min:.58,t:'Цикл идет, пока вы стоите рядом',stamp:'Допуск к переговорной',
+  d:'Система есть, дисциплины не хватает. Стоит вам уйти в отпуск, и даты начинают плавать. Начните с того, что перестанете переносить совещание под одного человека.'},
+ {min:.29,t:'Цикл держится на одном человеке',stamp:'Допуск к Excel',
+  d:'Планирование живет, пока жив энтузиаст. Уйдет один сотрудник, и цикл остановится вместе с ним. Нужен каркас: даты, формат решения, проверка исполнения.'},
+ {min:-1,t:'Цикла нет, есть совещания',stamp:'Допуск к чайнику',
+  d:'Отдельные встречи есть, ритма нет. Компания планирует дважды в год: когда верстает бюджет и когда разбирает, почему он не сбылся. Начинать нужно с пяти дат в календаре, остальное приложится.'}
+];
+const STEP_NAMES=['Сведенный факт','Прогноз спроса','План производства и запасов','План обеспечения','Итоговое совещание'];
+const STEP_DAYS=[5,8,12,16,20];
+const MONTH_GEN=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+let i=0, locked=false;
+const answers=new Array(12).fill(null);
+const $=id=>document.getElementById(id);
+
+const stubsEl=$('stubs');
+for(let k=0;k<12;k++){const d=document.createElement('div');d.className='stub';stubsEl.appendChild(d);}
+
+function answeredCount(){return answers.filter(v=>v!==null).length;}
+function totalScore(){return answers.reduce((s,v)=>s+(v||0),0);}
+
+function renderFront(){
+  const L=LEAFS[i];
+  $('monthLbl').textContent=L.m;
+  $('numLbl').textContent=i+1;
+  $('omenText').textContent=L.omen;
+  $('termText').innerHTML=L.term;
+  $('cnt').textContent=i+1;
+  const f=$('frontLayer');
+  f.classList.remove('torn','gone');
+  renderBack();
+}
+function renderBack(){
+  const L=LEAFS[i];
+  locked=false;
+  $('qSection').textContent=SECTIONS[L.s];
+  $('qText').textContent=L.q;
+  $('reply').classList.remove('show');
+  $('excuse').classList.remove('show');
+  $('btnNext').classList.remove('show');
+  $('btnNext').textContent=(i===11)?'Показать вердикт':'Следующий листок';
+  const box=$('answers');box.innerHTML='';
+  L.a.forEach((opt,idx)=>{
+    const b=document.createElement('button');
+    b.className='ans';b.textContent=opt[0];
+    b.onclick=()=>{
+      if(locked)return;
+      locked=true;
+      answers[i]=opt[1];
+      [...box.children].forEach((c,k)=>{
+        c.classList.add('locked');
+        const sc=L.a[k][1];
+        if(k===idx){
+          c.classList.add('picked');
+          c.classList.add(sc===2?'good':sc===1?'mid':'bad');
+          const mk=document.createElement('span');
+          mk.className='mark';
+          mk.textContent=sc===2?'+2':sc===1?'+1':'0';
+          c.appendChild(mk);
+        }else{
+          c.classList.add('dim');
+        }
+        c.onclick=null;
+      });
+      $('replyText').textContent=opt[2];
+      $('reply').classList.add('show');
+      $('excuseSay').textContent=L.ex[0];
+      $('excuseMean').textContent='Перевод: '+L.ex[1];
+      $('excuse').classList.add('show');
+      $('btnNext').classList.add('show');
+      $('score-live').textContent='баллы ритма: '+totalScore();
+      if(answeredCount()>=3)$('btnEarly').classList.add('show');
+      $('reply').scrollIntoView({behavior:'smooth',block:'nearest'});
+    };
+    box.appendChild(b);
+  });
+}
+function tear(){
+  if($('frontLayer').classList.contains('torn'))return;
+  $('frontLayer').classList.add('torn');
+  stubsEl.children[i].classList.add('on');
+}
+$('btnTear').onclick=e=>{e.stopPropagation();tear();};
+$('frontLayer').onclick=tear;
+$('frontLayer').addEventListener('animationend',()=>{
+  $('frontLayer').classList.add('gone');
+});
+$('btnNext').onclick=()=>{
+  if(!locked)return;
+  if(i===11){showVerdict();return;}
+  i++;
+  renderFront();
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+$('btnEarly').onclick=()=>{
+  if(answeredCount()<1)return;
+  showVerdict();
+};
+function sectionData(s){
+  let sc=0,n=0;
+  LEAFS.forEach((L,k)=>{if(L.s===s&&answers[k]!==null){sc+=answers[k];n++;}});
+  return {sc,n};
+}
+function sectionStatus(sc,n){
+  if(n===0)return 'не проверяли';
+  const p=sc/(n*2);
+  if(p>=.8)return 'в порядке';
+  if(p>=.45)return 'с перебоями';
+  return 'слабое звено';
+}
+function nthWorkday(y,m,n){
+  let d=new Date(y,m,1),cnt=0,last=null;
+  while(d.getMonth()===m){
+    const w=d.getDay();
+    if(w!==0&&w!==6){cnt++;last=new Date(d);if(cnt===n)return new Date(d);}
+    d.setDate(d.getDate()+1);
+  }
+  return last;
+}
+let datesText='';
+function buildFridge(){
+  const now=new Date();
+  let y=now.getFullYear(),m=now.getMonth()+1;
+  if(m>11){m=0;y++;}
+  $('fridgeSub').textContent='Даты цикла на '+MONTH_GEN[m]+' по рабочим дням, без учета переносов праздников. Ритм 5 / 8 / 12 / 16 / 20.';
+  const host=$('fridgeRows');host.innerHTML='';
+  const out=[];
+  STEP_DAYS.forEach((n,k)=>{
+    const d=nthWorkday(y,m,n);
+    const ds=String(d.getDate()).padStart(2,'0')+'.'+String(m+1).padStart(2,'0');
+    out.push(STEP_NAMES[k]+': '+ds);
+    const row=document.createElement('div');row.className='f-row';
+    row.innerHTML='<span class="f-dot">'+n+'</span><span class="f-name">'+STEP_NAMES[k]+'</span><span class="f-date">'+ds+'</span>';
+    host.appendChild(row);
+  });
+  datesText='Даты цикла планирования на '+MONTH_GEN[m]+':\n'+out.join('\n')+'\n\nПредлагаю закрепить эти пять дат и дальше двигать содержание, а не совещание.';
+}
+function copy(text){
+  navigator.clipboard.writeText(text).then(()=>{
+    const ts=$('toast');ts.classList.add('show');
+    setTimeout(()=>ts.classList.remove('show'),1800);
+  });
+}
+let lastResult=null;
+function showVerdict(){
+  const n=answeredCount();
+  if(n===0)return;
+  $('frontLayer').classList.add('gone');
+  $('backLayer').style.display='none';
+  $('btnEarly').classList.remove('show');
+  const total=totalScore(), max=n*2, pct=total/max;
+  const lvl=LEVELS.find(l=>pct>=l.min);
+  const secs=['A','B','C'].map(s=>{const d=sectionData(s);return {key:s,name:SECTIONS[s],sc:d.sc,n:d.n};});
+  const rated=secs.filter(x=>x.n>0);
+  const weakest=rated.reduce((m,x)=>(x.sc/(x.n*2)<m.sc/(m.n*2)?x:m),rated[0]);
+  $('vTitle').textContent=lvl.t;
+  $('vStamp').textContent=lvl.stamp;
+  $('vScore').textContent='Итог: '+total+' из '+max+' · листков пройдено: '+n+' из 12';
+  $('vDesc').textContent=lvl.d;
+  const tb=$('vTable');tb.innerHTML='';
+  secs.forEach(x=>{
+    const r=document.createElement('div');r.className='v-row';
+    const left=x.n?(x.name+' · '+x.sc+' из '+(x.n*2)):(x.name+' · листки не открыты');
+    r.innerHTML='<span>'+left+'</span><span class="st">'+sectionStatus(x.sc,x.n)+'</span>';
+    tb.appendChild(r);
+  });
+  $('prescTitle').textContent='Первые три шага: '+weakest.name.toLowerCase();
+  const pl=$('prescList');pl.innerHTML='';
+  PRESC[weakest.key].forEach(t=>{const li=document.createElement('li');li.textContent=t;pl.appendChild(li);});
+  const or=$('objRows');or.innerHTML='';
+  OBJ[weakest.key].forEach(p=>{
+    const row=document.createElement('div');row.className='obj-row';
+    row.innerHTML='<span class="said">'+p[0]+'</span><span class="answer">'+p[1]+'</span>';
+    or.appendChild(row);
+  });
+  $('phraseText').textContent=PHRASE[weakest.key];
+  buildFridge();
+  lastResult={total,max,n,level:lvl.t,stamp:lvl.stamp,weakest:weakest.name,secs};
+  $('verdict').classList.add('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+$('btnRestart').onclick=()=>{
+  i=0;locked=false;answers.fill(null);
+  $('score-live').textContent='баллы ритма: 0';
+  [...stubsEl.children].forEach(c=>c.classList.remove('on'));
+  $('verdict').classList.remove('show');
+  $('backLayer').style.display='flex';
+  renderFront();
+};
+$('btnCopy').onclick=()=>{
+  if(!lastResult)return;
+  copy('Отрывной календарь цикла: '+lastResult.total+' из '+lastResult.max+'. Звание: '+lastResult.level+'. Печать: '+lastResult.stamp+'. Слабое звено: '+lastResult.weakest+'. @zakupshchitsa_ural');
+};
+$('btnDates').onclick=()=>{if(datesText)copy(datesText);};
+/* ===== PNG карточка 1280x720 ===== */
+$('btnPng').onclick=()=>{
+  if(!lastResult)return;
+  const cv=$('cv'),ctx=cv.getContext('2d');
+  const W=1280,H=720;
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#123F31');g.addColorStop(.45,'#0C2E24');
+  g.addColorStop(.78,'#4E3040');g.addColorStop(1,'#7E4453');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=.13;ctx.fillStyle='#E8B4C5';
+  const seeds=[[120,90,26],[1180,140,20],[220,620,24],[1090,600,30],[640,60,16],[90,380,18],[1210,400,22]];
+  seeds.forEach(p=>{ctx.beginPath();ctx.ellipse(p[0],p[1],p[2],p[2]*0.55,Math.PI/4,0,Math.PI*2);ctx.fill();});
+  ctx.globalAlpha=1;
+  const cx=110,cy=90,cw=W-220,ch=H-180,r=16;
+  ctx.fillStyle='#FBF8F3';
+  ctx.beginPath();
+  ctx.moveTo(cx+r,cy);ctx.arcTo(cx+cw,cy,cx+cw,cy+ch,r);ctx.arcTo(cx+cw,cy+ch,cx,cy+ch,r);
+  ctx.arcTo(cx,cy+ch,cx,cy,r);ctx.arcTo(cx,cy,cx+cw,cy,r);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.arc(W/2,cy,26,0,Math.PI*2);
+  const mg=ctx.createRadialGradient(W/2-8,cy-8,4,W/2,cy,26);
+  mg.addColorStop(0,'#E8B4C5');mg.addColorStop(1,'#A76A80');
+  ctx.fillStyle=mg;ctx.fill();
+  ctx.strokeStyle='#C9B8A3';ctx.setLineDash([10,8]);ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(cx+30,cy+64);ctx.lineTo(cx+cw-30,cy+64);ctx.stroke();ctx.setLineDash([]);
+  const st=lastResult.stamp.toUpperCase();
+  ctx.font='700 16px Arial';
+  const stw=ctx.measureText(st).width+34;
+  ctx.strokeStyle='#7E4453';ctx.lineWidth=2;
+  const sx=cx+cw-40-stw, sy=cy+92;
+  ctx.beginPath();
+  ctx.moveTo(sx+18,sy);ctx.arcTo(sx+stw,sy,sx+stw,sy+38,18);ctx.arcTo(sx+stw,sy+38,sx,sy+38,18);
+  ctx.arcTo(sx,sy+38,sx,sy,18);ctx.arcTo(sx,sy,sx+stw,sy,18);ctx.closePath();ctx.stroke();
+  ctx.fillStyle='#7E4453';ctx.textAlign='center';
+  ctx.fillText(st,sx+stw/2,sy+25);
+  ctx.textAlign='center';ctx.fillStyle='#7E4453';
+  ctx.font='700 20px Arial';
+  ctx.fillText('ОТРЫВНОЙ КАЛЕНДАРЬ ЦИКЛА ПЛАНИРОВАНИЯ',W/2,cy+44);
+  ctx.fillStyle='#2A2F35';
+  ctx.font='700 50px Georgia';
+  ctx.fillText(lastResult.level.toUpperCase(),W/2,cy+178);
+  ctx.font='26px Arial';ctx.fillStyle='#3D434A';
+  ctx.fillText('Итог: '+lastResult.total+' из '+lastResult.max+' · листков '+lastResult.n+' из 12',W/2,cy+222);
+  const rowY=cy+282;
+  lastResult.secs.forEach((s,k)=>{
+    const y=rowY+k*54;
+    ctx.textAlign='left';
+    ctx.fillStyle='#2A2F35';ctx.font='22px Arial';
+    ctx.fillText(s.name,cx+80,y);
+    ctx.textAlign='right';
+    ctx.fillStyle='#7E4453';ctx.font='700 22px Arial';
+    const right=s.n?(s.sc+' из '+(s.n*2)+' · '+sectionStatus(s.sc,s.n)):'листки не открыты';
+    ctx.fillText(right,cx+cw-80,y);
+    ctx.strokeStyle='#E3D6C6';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx+80,y+16);ctx.lineTo(cx+cw-80,y+16);ctx.stroke();
+  });
+  ctx.textAlign='center';
+  ctx.font='italic 20px Georgia';ctx.fillStyle='#3D434A';
+  ctx.fillText('Ритм проверяется не в январе, а каждый месяц.',W/2,cy+ch-70);
+  ctx.font='16px Arial';ctx.fillStyle='#9A8C7B';
+  ctx.fillText('Серия S&OP → IBP · выпуск 7 · Лисак Е.Ф. · @zakupshchitsa_ural',W/2,cy+ch-32);
+  const a=document.createElement('a');
+  a.download='Sertifikat_na_holodilnik.png';
+  a.href=cv.toDataURL('image/png');
+  a.click();
+};
+renderFront();
+</script>
+</body>
+</html>
